@@ -22,8 +22,23 @@
       </section>
     </main>
   </div>
-  <script src="./config.js"></script>
-  <script src="./script.js"></script>
+  <script>
+    // Fetch the current deployment and quiz code on each page load. GitHub Pages
+    // otherwise lets browsers keep an outdated Apps Script URL for ten minutes.
+    (() => {
+      const version = Date.now();
+      const config = document.createElement('script');
+      config.src = `./config.js?reload=${version}`;
+      const loadQuiz = () => {
+        const quiz = document.createElement('script');
+        quiz.src = `./script.js?reload=${version}`;
+        document.body.appendChild(quiz);
+      };
+      config.onload = loadQuiz;
+      config.onerror = loadQuiz;
+      document.body.appendChild(config);
+    })();
+  </script>
   <script src="./fullscreen.js"></script>
 </body>
 </html>
