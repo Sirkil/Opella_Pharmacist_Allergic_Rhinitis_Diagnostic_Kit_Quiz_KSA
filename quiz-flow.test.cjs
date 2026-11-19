@@ -15,7 +15,7 @@ const document = {getElementById(id) {
 }};
 const context = vm.createContext({document,window:{QUIZ_SUBMIT_URL:''},crypto:{randomUUID:()=> '123e4567-e89b-42d3-a456-426614174000'}});
 const source = fs.readFileSync(path.join(__dirname, 'script.js'), 'utf8');
-vm.runInContext(`${source}\nglobalThis.quiz = {questions,state,submissionPayload};`,context);
+vm.runInContext(`${source}\ncheckAccess=()=>{state.access='open';render();return {then:fn=>fn({locked:false})};};state.access='open';render();globalThis.quiz = {questions,state,submissionPayload};`,context);
 const {questions,state,submissionPayload}=context.quiz;
 const screen=document.getElementById('screen');
 assert(screen.innerHTML.includes('id="participant-age"'));
@@ -59,7 +59,7 @@ run([['fever','yes'],['beyondNose','yes']],'إنفلونزا محتملة');
 run([['fever','yes'],['beyondNose','no']],'نزلة برد محتملة');
 run([['fever','no'],['discharge','thick']],'نزلة برد محتملة');
 run([['fever','no'],['discharge','watery'],['allergySigns','no']],'أسباب أخرى لالتهاب الأنف');
-run([['fever','no'],['discharge','watery'],['allergySigns','yes'],['air','yes']],'قد يتفاقم بتلوث الهواء');
+run([['fever','no'],['discharge','watery'],['allergySigns','yes'],['air','yes']],'التهاب أنف تحسسي متفاقم بتلوث الهواء');
 run([['fever','no'],['discharge','watery'],['allergySigns','yes'],['air','no']],'محفزات محتملة أخرى');
 
 begin();

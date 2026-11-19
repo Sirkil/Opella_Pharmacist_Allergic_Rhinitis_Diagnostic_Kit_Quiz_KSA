@@ -398,3 +398,54 @@ html[lang="ar"] .result-screen, html[lang="ar"] .details-screen { grid-template-
   .app { padding: 0 14px; }
   .participant-fields { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Access and lock screens use the same Opella artwork and type as the quiz. */
+.lock-screen, .access-screen {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 68px 18px 32px;
+  text-align: center;
+  color: #fff;
+}
+.lock-card, .access-card {
+  width: min(100%, 670px);
+  padding: clamp(30px, 5vw, 62px) clamp(22px, 5vw, 60px);
+  border: 1px solid #ffffff5c;
+  border-radius: 26px;
+  background: linear-gradient(145deg, #51135eea, #7a086fcf);
+  box-shadow: 0 22px 75px #36003480, inset 0 1px #ffffff33;
+  backdrop-filter: blur(12px);
+}
+.lock-mark {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 27px;
+  border: 1px solid #ffc27696;
+  border-radius: 24px;
+  background: #ffb45a1b;
+  color: #ffc276;
+}
+.lock-mark svg { width: 57px; height: 57px; }
+.lock-eyebrow {
+  color: #ffc276;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .22em;
+}
+.lock-card h1, .access-card h1 {
+  margin: 13px 0 12px;
+  font-size: clamp(32px, 5vw, 56px);
+  line-height: 1.1;
+}
+.lock-card p, .access-card p { margin: 0; font-size: clamp(17px, 2vw, 21px); line-height: 1.45; }
+.lock-card p::after { content: ''; display: block; width: 70px; height: 2px; margin: 28px auto 0; background: #ffc276; }
+.access-card .primary-button { margin: 28px auto 0; }
+@media (max-width: 600px) {
+  .lock-screen, .access-screen { padding: 68px 0 28px; }
+  .lock-mark { width: 76px; height: 76px; margin-bottom: 22px; }
+  .lock-mark svg { width: 48px; height: 48px; }
+  .lock-card, .access-card { border-radius: 20px; }
+}

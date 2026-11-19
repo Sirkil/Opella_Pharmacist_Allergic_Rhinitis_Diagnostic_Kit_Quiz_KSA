@@ -15,9 +15,47 @@ const results = {
 };
 const state = {
   currentKey:null, history:[], answers:Object.fromEntries(questions.map(q=>[q.key,null])),
-  details:false, participant:{age:'',gender:''}, submissionId:'', saveStatus:'idle'
+  details:false, participant:{age:'',gender:''}, submissionId:'', saveStatus:'idle', access:'checking'
 };
 const screen=document.getElementById('screen');
+const LOCK_AT=Date.parse('2027-11-19T00:00:00+02:00');
+// Preview is display-only: the quiz cannot be started or submitted in this mode.
+const lockPreview=typeof location!=='undefined' && new URLSearchParams(location.search).get('preview')==='locked';
+function statusRequest(submissionId=''){
+  return new Promise((resolve,reject)=>{
+    if(!window.QUIZ_SUBMIT_URL){reject(new Error('Missing submission URL'));return;}
+    const callback='quizStatus_'+Math.random().toString(36).slice(2);
+    const script=document.createElement('script');
+    const timer=setTimeout(()=>finish(new Error('Status request timed out')),12000);
+    function finish(error,value){
+      clearTimeout(timer);delete window[callback];script.remove();
+      error?reject(error):resolve(value);
+    }
+    window[callback]=value=>finish(null,value);
+    script.onerror=()=>finish(new Error('Status request failed'));
+    const url=new URL(window.QUIZ_SUBMIT_URL);
+    url.searchParams.set('callback',callback);
+    if(submissionId)url.searchParams.set('submissionId',submissionId);
+    url.searchParams.set('_',String(Date.now()));
+    script.src=url.toString();
+    document.head.appendChild(script);
+  });
+}
+async function checkAccess(submissionId=''){
+  if(lockPreview||Date.now()>=LOCK_AT){state.access='locked';render();return {locked:true};}
+  state.access='checking';render();
+  try{
+    const status=await statusRequest(submissionId);
+    if(!status.ok)throw new Error(status.error);
+    state.access=status.locked&&!status.accepted?'locked':'open';
+    render();
+    return status;
+  }catch(error){state.access='unavailable';render();return null;}
+}
+function lockScreen(){
+  return `<div class="lock-screen" role="alert" dir="ltr"><div class="lock-card"><div class="lock-mark" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="15" y="27" width="34" height="28" rx="7"/><path d="M22 27v-8a10 10 0 0 1 20 0v8"/><circle cx="32" cy="40" r="2"/><path d="M32 42v5"/></svg></div><span class="lock-eyebrow">QUIZ ACCESS</span><h1>This quiz is locked</h1><p>Please contact your technical support.</p></div></div>`;
+}
+function accessScreen(){return `<div class="access-screen" role="status"><div class="access-card"><span class="overline">فحص صيدلي تفاعلي</span><h1>${state.access==='checking'?'جارٍ التحقق من إتاحة الفحص…':'تعذر التحقق من إتاحة الفحص'}</h1><p>${state.access==='checking'?'يرجى الانتظار لحظة.':'تحقق من الاتصال بالإنترنت ثم أعد المحاولة.'}</p>${state.access==='unavailable'?'<button class="primary-button" type="button" data-action="check-access">إعادة المحاولة</button>':''}</div></div>`;}
 function classify(){
   let key=questions[0].key;
   const visited=new Set();
@@ -50,6 +88,12 @@ async function saveResult(){
   state.saveStatus='sending';render();
   try{
     await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(submissionPayload())});
+    const status=await statusRequest(state.submissionId);
+    if(!status.ok)throw new Error(status.error);
+    if(!status.accepted){
+      state.access=status.locked?'locked':'unavailable';
+      state.saveStatus='error';render();return;
+    }
     state.saveStatus='sent';
   }catch(error){state.saveStatus='error';}
   render();
@@ -78,18 +122,28 @@ function detailsScreen(r){
   return `<div class="details-screen"><div class="details-hero"><span class="overline">دعم قرار الصيدلي</span><h1>لماذا ظهر هذا المسار؟</h1><p>${r.reason}</p></div><div class="details-body"><div class="detail-list"><span class="block-label">الإجابات في هذا المسار</span>${lines}</div><div class="counsel-card"><span class="block-label">إرشاد للصيدلي</span><p>${r.counsel}</p></div><div class="result-actions"><button class="text-button" type="button" data-action="summary">→ الملخص</button><button class="primary-button" type="button" data-action="reset">فحص جديد <span aria-hidden="true">↖</span></button></div></div></div>`;
 }
 function render(){
+  if(state.access==='locked'){screen.innerHTML=lockScreen();return;}
+  if(state.access!=='open'){screen.innerHTML=accessScreen();return;}
   const intro=state.currentKey===null,done=state.currentKey==='result';
   screen.innerHTML=intro?introScreen():done?resultScreen():questionScreen();
 }
 screen.addEventListener('click',event=>{
+  const action=event.target.closest('[data-action]')?.dataset.action;
+  if(action==='check-access'){checkAccess(state.submissionId);return;}
+  if(state.access!=='open')return;
   const option=event.target.closest('[data-value]');
   if(option&&questionByKey[state.currentKey]){state.answers[state.currentKey]=option.dataset.value;render();return;}
-  const action=event.target.closest('[data-action]')?.dataset.action;
   if(!action)return;
   if(action==='start'){
+    if(Date.now()>=LOCK_AT){state.access='locked';render();return;}
     if(!validParticipant()){document.getElementById('participant-error').textContent='أدخل العمر الصحيح واختر النوع للمتابعة.';return;}
-    state.currentKey=questions[0].key;
-    state.submissionId=crypto.randomUUID();
+    checkAccess().then(status=>{
+      if(!status||status.locked||state.access!=='open')return;
+      state.currentKey=questions[0].key;
+      state.submissionId=crypto.randomUUID();
+      render();
+    });
+    return;
   }
   if(action==='next'&&questionByKey[state.currentKey]){
     const next=routeFrom(state.currentKey);
@@ -109,6 +163,7 @@ screen.addEventListener('click',event=>{
   if(action==='reset'){
     state.currentKey=null;state.history=[];state.answers=Object.fromEntries(questions.map(q=>[q.key,null]));
     state.details=false;state.participant={age:'',gender:''};state.submissionId='';state.saveStatus='idle';
+    checkAccess();return;
   }
   render();
 });
@@ -121,4 +176,4 @@ function updateParticipant(event){
 }
 screen.addEventListener('input',updateParticipant);
 screen.addEventListener('change',updateParticipant);
-render();
+checkAccess();
